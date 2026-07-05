@@ -1,7 +1,10 @@
+import json
+from dataclasses import asdict
 from datetime import UTC, datetime
 
 from modelwatch.digest import render_digest
 from modelwatch.models import Candidate, RawItem
+from modelwatch.normalize import model_key
 from modelwatch.pipeline import run_pipeline
 from modelwatch.scoring import action_for_score, score_candidate
 from modelwatch.store import Store
@@ -113,3 +116,25 @@ def test_pipeline_survives_failed_connector(tmp_path):
     assert result.source_count == 1
     assert result.candidate_count == 1
     assert result.digest_path.exists()
+
+
+def test_store_normalizes_older_bad_candidate_payload(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    bad = asdict(candidate("Qwen3 4B Instruct", 86))
+    bad["availability"] = "Hugging Face"
+    bad["evidence_urls"] = "https://example.test/model"
+    store.db.execute(
+        "insert into candidates (model_key, payload) values (?, ?)",
+        ("qwen:qwen34b:4b", json.dumps(bad)),
+    )
+    store.db.commit()
+
+    store.upsert_candidate(candidate("Qwen/Qwen3-4B-Instruct", 80))
+
+    [merged] = store.list_candidates()
+    assert merged.availability == [{"platform": "Hugging Face", "url": "https://hf.test/qwen"}]
+    assert merged.evidence_urls == ["https://example.test/model"]
+
+
+def test_model_key_accepts_numeric_parameter_size():
+    assert model_key("Qwen", "Qwen3", 4) == "qwen:qwen3:4"

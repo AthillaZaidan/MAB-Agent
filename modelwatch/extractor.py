@@ -4,6 +4,7 @@ import json
 import re
 from typing import Any
 
+from modelwatch.coerce import as_list, null_if_string_null
 from modelwatch.http import post_json
 from modelwatch.models import Candidate, RawItem
 
@@ -39,7 +40,13 @@ class OllamaExtractor:
             payload = self._extract(build_prompt(item, strict=True))
         if payload.get("release_type") in {None, "irrelevant"} or not payload.get("model_name"):
             return None
+        payload = {key: null_if_string_null(value) for key, value in payload.items()}
         merged = SCHEMA_DEFAULTS | payload
+        list_fields = ["modality", "claimed_strengths", "benchmark_claims", "availability", "evidence_urls"]
+        for field in list_fields:
+            merged[field] = as_list(merged[field])
+        merged["benchmark_claims"] = [claim for claim in merged["benchmark_claims"] if isinstance(claim, dict)]
+        merged["availability"] = [entry for entry in merged["availability"] if isinstance(entry, dict)]
         urls = list(dict.fromkeys([item.source_url, *merged["evidence_urls"]]))
         return Candidate(
             canonical_model_name=merged["model_name"],

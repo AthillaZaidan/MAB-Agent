@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from modelwatch.coerce import as_list
 from modelwatch.models import Candidate, RawItem
 from modelwatch.normalize import model_key
 
@@ -111,6 +112,12 @@ class Store:
 
     @staticmethod
     def _candidate_from_payload(payload: dict[str, Any]) -> Candidate:
+        payload["modality"] = as_list(payload.get("modality")) or ["unknown"]
+        payload["claimed_strengths"] = as_list(payload.get("claimed_strengths"))
+        payload["benchmark_claims"] = [claim for claim in as_list(payload.get("benchmark_claims")) if isinstance(claim, dict)]
+        payload["availability"] = [entry for entry in as_list(payload.get("availability")) if isinstance(entry, dict)]
+        payload["evidence_urls"] = as_list(payload.get("evidence_urls"))
+        payload["aliases"] = as_list(payload.get("aliases"))
         return Candidate(**payload)
 
     @staticmethod
