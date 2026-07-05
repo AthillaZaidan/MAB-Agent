@@ -90,6 +90,70 @@ def test_extractor_accepts_string_null_confidence_from_ollama():
     assert candidate.confidence == 0
 
 
+def test_extractor_accepts_confidence_labels_from_ollama():
+    class StubExtractor(OllamaExtractor):
+        def _extract(self, prompt):
+            return {
+                "model_name": "Qwen3 4B Instruct",
+                "provider": "Qwen",
+                "release_type": "new_model",
+                "modality": ["text"],
+                "access_type": "open_weight",
+                "confidence": "medium",
+                "evidence_urls": [],
+            }
+
+    candidate = StubExtractor("http://ollama.test", "qwen3:4b-instruct")(
+        RawItem(
+            source_name="fixture",
+            source_type="blog",
+            source_url="https://example.test/qwen",
+            title="Qwen3 4B Instruct",
+            author_or_provider="Qwen",
+            published_at=datetime(2026, 7, 5, tzinfo=UTC),
+            updated_at=None,
+            raw_text="Qwen3 4B Instruct is released.",
+            raw_metadata={},
+        )
+    )
+
+    assert candidate is not None
+    assert candidate.confidence == 0.5
+
+
+def test_extractor_coerces_context_length_from_ollama():
+    class StubExtractor(OllamaExtractor):
+        def _extract(self, prompt):
+            return {
+                "model_name": "Qwen3 4B Instruct",
+                "provider": "Qwen",
+                "release_type": "new_model",
+                "modality": ["text"],
+                "access_type": "open_weight",
+                "context_length": "32,768 tokens",
+                "confidence": "unknown",
+                "evidence_urls": [],
+            }
+
+    candidate = StubExtractor("http://ollama.test", "qwen3:4b-instruct")(
+        RawItem(
+            source_name="fixture",
+            source_type="blog",
+            source_url="https://example.test/qwen",
+            title="Qwen3 4B Instruct",
+            author_or_provider="Qwen",
+            published_at=datetime(2026, 7, 5, tzinfo=UTC),
+            updated_at=None,
+            raw_text="Qwen3 4B Instruct is released.",
+            raw_metadata={},
+        )
+    )
+
+    assert candidate is not None
+    assert candidate.context_length == 32768
+    assert candidate.confidence == 0
+
+
 def test_extractor_normalizes_scalar_list_fields_from_ollama():
     class StubExtractor(OllamaExtractor):
         def _extract(self, prompt):

@@ -7,7 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from modelwatch.coerce import as_list
+from modelwatch.coerce import as_float, as_int, as_list
 from modelwatch.models import Candidate, RawItem
 from modelwatch.normalize import model_key
 
@@ -118,6 +118,8 @@ class Store:
         payload["availability"] = [entry for entry in as_list(payload.get("availability")) if isinstance(entry, dict)]
         payload["evidence_urls"] = as_list(payload.get("evidence_urls"))
         payload["aliases"] = as_list(payload.get("aliases"))
+        payload["confidence"] = as_float(payload.get("confidence"))
+        payload["context_length"] = as_int(payload.get("context_length"))
         return Candidate(**payload)
 
     @staticmethod

@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from modelwatch.coerce import as_list, null_if_string_null
+from modelwatch.coerce import as_float, as_int, as_list, null_if_string_null
 from modelwatch.http import post_json
 from modelwatch.models import Candidate, RawItem
 
@@ -57,11 +57,11 @@ class OllamaExtractor:
             access_type=merged["access_type"] or "unknown",
             license=merged["license"],
             parameter_size=merged["parameter_size"],
-            context_length=merged["context_length"],
+            context_length=as_int(merged["context_length"]),
             claimed_strengths=merged["claimed_strengths"] or [],
             benchmark_claims=merged["benchmark_claims"] or [],
             availability=merged["availability"] or [{"platform": item.source_name, "url": item.source_url}],
-            confidence=float(merged["confidence"] or 0),
+            confidence=as_float(merged["confidence"]),
             evidence_urls=urls,
         )
 
