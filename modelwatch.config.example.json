@@ -1,0 +1,17 @@
+{
+  "output_dir": "data/digests",
+  "database_path": "data/modelwatch.sqlite",
+  "ollama_url": "http://localhost:11434",
+  "ollama_model": "qwen3:4b-instruct",
+  "max_items_per_source": 20,
+  "github_repos": [
+    "ollama/ollama",
+    "vllm-project/vllm",
+    "huggingface/transformers"
+  ],
+  "rss_urls": [
+    "https://openai.com/news/rss.xml",
+    "https://www.anthropic.com/news/rss.xml",
+    "https://mistral.ai/news/feed.xml"
+  ]
+}
