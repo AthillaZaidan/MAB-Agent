@@ -30,6 +30,7 @@ def main() -> None:
         store=Store(config.database_path),
         output_dir=config.output_dir,
         window_hours=args.window_hours,
+        log=lambda message: print(message, flush=True),
     )
     print(
         f"{result.status}: {result.source_count} source items, "

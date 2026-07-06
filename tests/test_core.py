@@ -118,6 +118,31 @@ def test_pipeline_survives_failed_connector(tmp_path):
     assert result.digest_path.exists()
 
 
+def test_pipeline_logs_connector_progress_and_failures(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    logs = []
+
+    def bad_connector(_window):
+        raise RuntimeError("HTTP Error 429: Too Many Requests")
+
+    def good_connector(_window):
+        return [item("Qwen3 4B Instruct")]
+
+    run_pipeline(
+        connectors=[bad_connector, good_connector],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=store,
+        output_dir=tmp_path,
+        log=logs.append,
+    )
+
+    assert "[source] bad_connector start" in logs
+    assert "[source] bad_connector failed: RuntimeError: HTTP Error 429: Too Many Requests" in logs
+    assert "[source] good_connector fetched 1 items" in logs
+    assert "[extract] good_connector 1/1 Qwen3 4B Instruct" in logs
+    assert any(line.startswith("[done] partial_success:") for line in logs)
+
+
 def test_store_normalizes_older_bad_candidate_payload(tmp_path):
     store = Store(tmp_path / "modelwatch.sqlite")
     bad = asdict(candidate("Qwen3 4B Instruct", 86))
