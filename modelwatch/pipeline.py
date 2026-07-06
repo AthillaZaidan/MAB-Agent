@@ -8,7 +8,7 @@ from modelwatch.digest import render_digest
 from modelwatch.models import Candidate, JudgeDecision, PipelineResult, RawItem
 from modelwatch.normalize import model_key
 from modelwatch.rag import VectorStore, chunk_text
-from modelwatch.scoring import score_candidate
+from modelwatch.scoring import rejection_reason, score_candidate
 from modelwatch.store import Store
 
 Connector = Callable[[int], list[RawItem]]
@@ -74,6 +74,10 @@ def run_pipeline(
             emit(log, f"[extract] {name} {index}/{len(items)} {item.title}")
             candidate = extractor(item)
             if candidate is not None:
+                reason = rejection_reason(candidate)
+                if reason:
+                    emit(log, f"[filter] {name} {candidate.canonical_model_name} rejected: {reason}")
+                    continue
                 scored = score_candidate(candidate)
                 if rag_enabled:
                     try:

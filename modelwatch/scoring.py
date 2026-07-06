@@ -1,11 +1,47 @@
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 
 from modelwatch.models import Candidate
 
 
-IMPORTANT_PROVIDERS = {"openai", "anthropic", "google", "meta", "qwen", "deepseek", "mistral"}
+IMPORTANT_PROVIDERS = {
+    "ai21",
+    "aisingapore",
+    "allenai",
+    "anthropic",
+    "baidu",
+    "bytedance",
+    "deepseek",
+    "deepseek-ai",
+    "google",
+    "gotocompany",
+    "huggingfacetb",
+    "liquidai",
+    "meta",
+    "meta-llama",
+    "microsoft",
+    "minimax",
+    "minimaxai",
+    "mistral",
+    "mistralai",
+    "moonshotai",
+    "nvidia",
+    "opengvlab",
+    "openai",
+    "qwen",
+    "tiiuae",
+    "x-ai",
+    "xiaomi",
+    "z-ai",
+    "zai-org",
+}
+MODEL_FAMILY_RE = re.compile(
+    r"gpt|claude|gemini|grok|deepseek|qwen|glm|gemma|llama|mistral|kimi|minimax|"
+    r"nemotron|nova|doubao|seed|falcon|phi|ernie|mimo|lfm|internvl|olmo|sea-lion|sahabat",
+    re.IGNORECASE,
+)
 
 
 def action_for_score(score: float) -> str:
@@ -20,7 +56,7 @@ def action_for_score(score: float) -> str:
 
 def score_candidate(candidate: Candidate) -> Candidate:
     novelty = 100 if candidate.release_type == "new_model" else 70 if candidate.release_type != "irrelevant" else 0
-    provider = 100 if (candidate.provider or "").lower() in IMPORTANT_PROVIDERS else 55
+    provider = 100 if is_important_provider(candidate.provider) else 55
     availability = 100 if candidate.access_type in {"open_weight", "api_only"} else 35
     benchmark = 100 if candidate.benchmark_claims or candidate.claimed_strengths else 40
     modality = 100 if {"text", "vision"} & set(candidate.modality) else 45
@@ -35,3 +71,36 @@ def score_candidate(candidate: Candidate) -> Candidate:
     )
     score = round(score, 1)
     return replace(candidate, benchmark_relevance_score=score, recommended_action=action_for_score(score))
+
+
+def rejection_reason(candidate: Candidate) -> str | None:
+    if candidate.release_type in {None, "irrelevant"}:
+        return "irrelevant release type"
+    hf_owner = huggingface_owner(candidate)
+    if hf_owner and not is_important_provider(hf_owner):
+        return f"untrusted Hugging Face owner: {hf_owner}"
+    text = " ".join(
+        [
+            candidate.canonical_model_name,
+            candidate.provider or "",
+            " ".join(candidate.claimed_strengths),
+            " ".join(candidate.evidence_urls),
+        ]
+    )
+    if not MODEL_FAMILY_RE.search(text):
+        return "no frontier model family signal"
+    return None
+
+
+def is_important_provider(provider: str | None) -> bool:
+    if not provider:
+        return False
+    return provider.lower().replace("_", "-") in IMPORTANT_PROVIDERS
+
+
+def huggingface_owner(candidate: Candidate) -> str | None:
+    for url in candidate.evidence_urls:
+        match = re.search(r"https://huggingface\.co/([^/\s]+)", url)
+        if match:
+            return match.group(1)
+    return None

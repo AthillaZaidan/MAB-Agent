@@ -180,6 +180,49 @@ def test_pipeline_judges_items_before_extraction(tmp_path):
     assert "[judge] <lambda> Qwen/Qwen3-30B-A3B kept: benchmark-worthy foundation model" in logs
 
 
+def test_pipeline_filters_random_huggingface_models_after_extraction(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    logs = []
+    source_items = [
+        item("random-user/qwen-lora", "https://huggingface.co/random-user/qwen-lora"),
+        item("Qwen/Qwen3-30B-A3B", "https://huggingface.co/Qwen/Qwen3-30B-A3B"),
+        item("Claude Opus 4.7", "https://openrouter.ai/anthropic/claude-opus-4.7"),
+    ]
+
+    def extractor(raw_item):
+        return Candidate(
+            canonical_model_name=raw_item.title,
+            provider=raw_item.author_or_provider,
+            release_type="new_model",
+            release_date="2026-07-05",
+            modality=["text"],
+            access_type="open_weight",
+            license=None,
+            parameter_size=None,
+            context_length=None,
+            claimed_strengths=["reasoning"],
+            benchmark_claims=[],
+            availability=[{"platform": raw_item.source_name, "url": raw_item.source_url}],
+            confidence=0.9,
+            evidence_urls=[raw_item.source_url],
+        )
+
+    result = run_pipeline(
+        connectors=[lambda _window: source_items],
+        extractor=extractor,
+        store=store,
+        output_dir=tmp_path,
+        log=logs.append,
+    )
+
+    digest = result.digest_path.read_text(encoding="utf-8")
+    assert result.candidate_count == 2
+    assert "random-user/qwen-lora" not in digest
+    assert "Qwen/Qwen3-30B-A3B" in digest
+    assert "Claude Opus 4.7" in digest
+    assert any(line.startswith("[filter]") and "random-user/qwen-lora" in line for line in logs)
+
+
 def test_pipeline_stores_and_retrieves_rag_evidence(tmp_path):
     store = Store(tmp_path / "modelwatch.sqlite")
     vectors = VectorStore(tmp_path / "vectors.sqlite")
