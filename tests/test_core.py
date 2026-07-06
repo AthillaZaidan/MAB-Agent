@@ -200,8 +200,11 @@ def test_pipeline_stores_and_retrieves_rag_evidence(tmp_path):
 
 def test_pipeline_continues_when_rag_embedding_fails(tmp_path):
     logs = []
+    calls = 0
 
     def broken_embed(_text):
+        nonlocal calls
+        calls += 1
         raise RuntimeError("embedding model missing")
 
     result = run_pipeline(
@@ -217,6 +220,31 @@ def test_pipeline_continues_when_rag_embedding_fails(tmp_path):
     assert result.status == "success"
     assert result.candidate_count == 1
     assert any(line.startswith("[rag]") and "embedding model missing" in line for line in logs)
+    assert calls == 1
+
+
+def test_pipeline_disables_rag_after_first_embedding_failure(tmp_path):
+    calls = 0
+    logs = []
+
+    def broken_embed(_text):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("embedding model missing")
+
+    run_pipeline(
+        connectors=[lambda _window: [item("Qwen/Qwen3-30B-A3B"), item("Qwen/Qwen3-14B")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=Store(tmp_path / "modelwatch.sqlite"),
+        output_dir=tmp_path,
+        vector_store=VectorStore(tmp_path / "vectors.sqlite"),
+        embed=broken_embed,
+        log=logs.append,
+    )
+
+    rag_logs = [line for line in logs if line.startswith("[rag]")]
+    assert calls == 1
+    assert len(rag_logs) == 1
 
 
 def test_pipeline_logs_connector_progress_and_failures(tmp_path):

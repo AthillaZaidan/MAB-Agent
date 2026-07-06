@@ -34,6 +34,7 @@ def run_pipeline(
     failures: dict[str, str] = {}
     source_count = 0
     run_candidate_keys: set[str] = set()
+    rag_enabled = vector_store is not None and embed is not None
 
     for connector in connectors:
         name = getattr(connector, "__name__", connector.__class__.__name__)
@@ -52,12 +53,13 @@ def run_pipeline(
         for item in items:
             if store.save_source_item(item):
                 source_count += 1
-            if vector_store is not None and embed is not None:
+            if rag_enabled:
                 try:
                     for chunk in chunk_text(item.raw_text, source_url=item.source_url):
                         vector_store.add(chunk.text, chunk.source_url, embed(chunk.text))
                 except Exception as exc:  # ponytail: RAG is evidence enhancement; extraction still runs without it.
                     emit(log, f"[rag] {name} {item.title} embed failed: {exc.__class__.__name__}: {exc}")
+                    rag_enabled = False
         for index, item in enumerate(items, 1):
             if judge is not None:
                 try:
@@ -73,7 +75,7 @@ def run_pipeline(
             candidate = extractor(item)
             if candidate is not None:
                 scored = score_candidate(candidate)
-                if vector_store is not None and embed is not None:
+                if rag_enabled:
                     try:
                         query = " ".join([scored.canonical_model_name, scored.provider or "", *scored.claimed_strengths])
                         scored.evidence_chunks = [
@@ -83,6 +85,7 @@ def run_pipeline(
                         scored.evidence_urls = list(dict.fromkeys([*scored.evidence_urls, *[chunk["source_url"] for chunk in scored.evidence_chunks]]))
                     except Exception as exc:  # ponytail: digest can still cite source URLs if vector lookup fails.
                         emit(log, f"[rag] {name} {scored.canonical_model_name} retrieve failed: {exc.__class__.__name__}: {exc}")
+                        rag_enabled = False
                 store.upsert_candidate(scored)
                 run_candidate_keys.add(model_key(scored.provider, scored.canonical_model_name, scored.parameter_size))
                 emit(log, f"[extract] {name} candidate: {scored.canonical_model_name}")
