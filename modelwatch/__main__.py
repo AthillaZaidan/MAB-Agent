@@ -4,6 +4,7 @@ import argparse
 
 from modelwatch.config import load_config
 from modelwatch.connectors import default_connectors
+from modelwatch.emailer import email_config_from_env, send_digest_email
 from modelwatch.extractor import OllamaExtractor
 from modelwatch.judge import OllamaJudge
 from modelwatch.pipeline import run_pipeline
@@ -41,6 +42,13 @@ def main() -> None:
         f"{result.status}: {result.source_count} source items, "
         f"{result.candidate_count} candidates, digest={result.digest_path}"
     )
+    if config.email_to:
+        try:
+            send_digest_email(result.digest_path, email_config_from_env(config.email_to))
+        except Exception as exc:
+            print(f"[email] failed: {exc.__class__.__name__}: {exc}", flush=True)
+        else:
+            print(f"[email] sent to {config.email_to}", flush=True)
 
 
 if __name__ == "__main__":

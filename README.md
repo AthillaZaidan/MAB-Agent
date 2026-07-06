@@ -22,6 +22,17 @@ The extractor calls Ollama at `http://localhost:11434` and defaults to
 `qwen3:4b-instruct`.
 Evidence embeddings default to `nomic-embed-text`.
 
+If `email_to` is set in the config, the digest is sent through SMTP after the
+run. Keep credentials in environment variables:
+
+```bash
+export MODELWATCH_SMTP_HOST=smtp.gmail.com
+export MODELWATCH_SMTP_PORT=587
+export MODELWATCH_SMTP_USERNAME=your-address@gmail.com
+export MODELWATCH_SMTP_PASSWORD='gmail-app-password'
+export MODELWATCH_EMAIL_FROM='ModelWatch <your-address@gmail.com>'
+```
+
 The run uses a bounded AI judge before extraction:
 
 ```text
