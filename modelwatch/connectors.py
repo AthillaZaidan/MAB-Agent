@@ -160,12 +160,18 @@ class RssConnector:
     def __init__(self, urls: list[str], max_items: int = 20):
         self.urls = urls
         self.max_items = max_items
+        self.failures: dict[str, str] = {}
 
     def __call__(self, window_hours: int) -> list[RawItem]:
         cutoff = datetime.now(UTC) - timedelta(hours=window_hours)
         items = []
+        self.failures = {}
         for feed_url in self.urls:
-            root = ET.fromstring(get_text(feed_url))
+            try:
+                root = ET.fromstring(get_text(feed_url))
+            except Exception as exc:  # ponytail: per-feed isolation, not a full RSS connector failure.
+                self.failures[feed_url] = f"{exc.__class__.__name__}: {exc}"
+                continue
             entries = root.findall(".//item") or root.findall("{http://www.w3.org/2005/Atom}entry")
             for entry in entries[: self.max_items]:
                 title = child_text(entry, "title")
@@ -219,7 +225,9 @@ def text(node, path: str, ns: dict[str, str]) -> str:
 
 
 def child_text(node, name: str) -> str:
-    found = node.find(name) or node.find(f"{{http://www.w3.org/2005/Atom}}{name}")
+    found = node.find(name)
+    if found is None:
+        found = node.find(f"{{http://www.w3.org/2005/Atom}}{name}")
     if found is None:
         return ""
     if name == "link" and found.attrib.get("href"):

@@ -36,6 +36,10 @@ def run_pipeline(
             failures[name] = str(exc)
             emit(log, f"[source] {name} failed: {exc.__class__.__name__}: {exc}")
             continue
+        for failed_name, reason in getattr(connector, "failures", {}).items():
+            key = f"{name}:{failed_name}"
+            failures[key] = reason
+            emit(log, f"[source] {name} warning: {failed_name}: {reason}")
         emit(log, f"[source] {name} fetched {len(items)} items")
         for item in items:
             if store.save_source_item(item):

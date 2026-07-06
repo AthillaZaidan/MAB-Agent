@@ -127,6 +127,7 @@ def test_pipeline_logs_connector_progress_and_failures(tmp_path):
 
     def good_connector(_window):
         return [item("Qwen3 4B Instruct")]
+    good_connector.failures = {"https://bad.test/rss.xml": "HTTPError: HTTP Error 404: Not Found"}
 
     run_pipeline(
         connectors=[bad_connector, good_connector],
@@ -138,6 +139,7 @@ def test_pipeline_logs_connector_progress_and_failures(tmp_path):
 
     assert "[source] bad_connector start" in logs
     assert "[source] bad_connector failed: RuntimeError: HTTP Error 429: Too Many Requests" in logs
+    assert "[source] good_connector warning: https://bad.test/rss.xml: HTTPError: HTTP Error 404: Not Found" in logs
     assert "[source] good_connector fetched 1 items" in logs
     assert "[extract] good_connector 1/1 Qwen3 4B Instruct" in logs
     assert any(line.startswith("[done] partial_success:") for line in logs)

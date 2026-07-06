@@ -11,7 +11,6 @@
   ],
   "rss_urls": [
     "https://openai.com/news/rss.xml",
-    "https://www.anthropic.com/news/rss.xml",
-    "https://mistral.ai/news/feed.xml"
+    "https://mistral.ai/rss.xml"
   ]
 }
