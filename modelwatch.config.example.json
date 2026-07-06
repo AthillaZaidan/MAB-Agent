@@ -1,8 +1,10 @@
 {
   "output_dir": "data/digests",
   "database_path": "data/modelwatch.sqlite",
+  "vector_database_path": "data/vectors.sqlite",
   "ollama_url": "http://localhost:11434",
   "ollama_model": "qwen3:4b-instruct",
+  "ollama_embedding_model": "nomic-embed-text",
   "max_items_per_source": 100,
   "github_repos": [
     "ollama/ollama",

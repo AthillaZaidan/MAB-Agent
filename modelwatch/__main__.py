@@ -7,6 +7,7 @@ from modelwatch.connectors import default_connectors
 from modelwatch.extractor import OllamaExtractor
 from modelwatch.judge import OllamaJudge
 from modelwatch.pipeline import run_pipeline
+from modelwatch.rag import OllamaEmbedder, VectorStore
 from modelwatch.store import Store
 
 
@@ -30,6 +31,8 @@ def main() -> None:
         extractor=OllamaExtractor(config.ollama_url, config.ollama_model),
         judge=OllamaJudge(config.ollama_url, config.ollama_model),
         store=Store(config.database_path),
+        vector_store=VectorStore(config.vector_database_path),
+        embed=OllamaEmbedder(config.ollama_url, config.ollama_embedding_model),
         output_dir=config.output_dir,
         window_hours=args.window_hours,
         log=lambda message: print(message, flush=True),

@@ -9,8 +9,10 @@ from pathlib import Path
 class Config:
     output_dir: Path = Path("data/digests")
     database_path: Path = Path("data/modelwatch.sqlite")
+    vector_database_path: Path = Path("data/vectors.sqlite")
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:4b-instruct"
+    ollama_embedding_model: str = "nomic-embed-text"
     rss_urls: list[str] = field(default_factory=list)
     github_repos: list[str] = field(default_factory=list)
     arxiv_query: str = 'cat:cs.CL AND (LLM OR "large language model" OR multimodal)'
@@ -23,7 +25,7 @@ def load_config(path: str | Path | None) -> Config:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     config = Config()
     for key, value in payload.items():
-        if key in {"output_dir", "database_path"}:
+        if key in {"output_dir", "database_path", "vector_database_path"}:
             value = Path(value)
         setattr(config, key, value)
     return config

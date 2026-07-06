@@ -15,10 +15,12 @@ python -m modelwatch run --window-hours 48 --config modelwatch.config.example.js
 The run writes:
 
 - SQLite state to `data/modelwatch.sqlite`
+- SQLite vector evidence to `data/vectors.sqlite`
 - Markdown digest to `data/digests/digest-YYYY-MM-DD.md`
 
 The extractor calls Ollama at `http://localhost:11434` and defaults to
 `qwen3:4b-instruct`.
+Evidence embeddings default to `nomic-embed-text`.
 
 The run uses a bounded AI judge before extraction:
 
