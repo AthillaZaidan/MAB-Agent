@@ -41,6 +41,13 @@ class Candidate:
 
 
 @dataclass
+class JudgeDecision:
+    keep: bool
+    reason: str
+    confidence: float = 0
+
+
+@dataclass
 class PipelineResult:
     status: str
     source_count: int

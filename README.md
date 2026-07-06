@@ -20,6 +20,15 @@ The run writes:
 The extractor calls Ollama at `http://localhost:11434` and defaults to
 `qwen3:4b-instruct`.
 
+The run uses a bounded AI judge before extraction:
+
+```text
+API/RSS source -> broad candidates -> Ollama judge keep/reject -> extract kept items -> digest
+```
+
+This avoids hardcoding a fixed model list while still rejecting random LoRAs,
+test uploads, and weak fine-tunes before they reach the digest.
+
 ## Schedule
 
 Print a cron entry for the daily 01.00 run:

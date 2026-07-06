@@ -3,7 +3,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 
 from modelwatch.digest import render_digest
-from modelwatch.models import Candidate, RawItem
+from modelwatch.models import Candidate, JudgeDecision, RawItem
 from modelwatch.normalize import model_key
 from modelwatch.pipeline import run_pipeline
 from modelwatch.scoring import action_for_score, score_candidate
@@ -132,6 +132,38 @@ def test_pipeline_digest_only_uses_candidates_from_current_run(tmp_path):
     digest = result.digest_path.read_text(encoding="utf-8")
     assert "Qwen/Qwen3-30B-A3B" in digest
     assert "old-random-model" not in digest
+
+
+def test_pipeline_judges_items_before_extraction(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    logs = []
+    extracted = []
+    source_items = [item("random-user/cool-lora"), item("Qwen/Qwen3-30B-A3B")]
+
+    def judge(raw_item):
+        return JudgeDecision(
+            keep=raw_item.title.startswith("Qwen/"),
+            reason="benchmark-worthy foundation model" if raw_item.title.startswith("Qwen/") else "personal LoRA",
+            confidence=0.9,
+        )
+
+    def extractor(raw_item):
+        extracted.append(raw_item.title)
+        return candidate(raw_item.title)
+
+    result = run_pipeline(
+        connectors=[lambda _window: source_items],
+        extractor=extractor,
+        judge=judge,
+        store=store,
+        output_dir=tmp_path,
+        log=logs.append,
+    )
+
+    assert extracted == ["Qwen/Qwen3-30B-A3B"]
+    assert result.candidate_count == 1
+    assert "[judge] <lambda> random-user/cool-lora rejected: personal LoRA" in logs
+    assert "[judge] <lambda> Qwen/Qwen3-30B-A3B kept: benchmark-worthy foundation model" in logs
 
 
 def test_pipeline_logs_connector_progress_and_failures(tmp_path):

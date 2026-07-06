@@ -5,13 +5,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from modelwatch.digest import render_digest
-from modelwatch.models import Candidate, PipelineResult, RawItem
+from modelwatch.models import Candidate, JudgeDecision, PipelineResult, RawItem
 from modelwatch.normalize import model_key
 from modelwatch.scoring import score_candidate
 from modelwatch.store import Store
 
 Connector = Callable[[int], list[RawItem]]
 Extractor = Callable[[RawItem], Candidate | None]
+Judge = Callable[[RawItem], JudgeDecision]
 Logger = Callable[[str], None]
 
 
@@ -22,6 +23,7 @@ def run_pipeline(
     store: Store,
     output_dir: str | Path,
     window_hours: int = 48,
+    judge: Judge | None = None,
     log: Logger | None = None,
 ) -> PipelineResult:
     started = datetime.now(UTC)
@@ -47,6 +49,16 @@ def run_pipeline(
             if store.save_source_item(item):
                 source_count += 1
         for index, item in enumerate(items, 1):
+            if judge is not None:
+                try:
+                    decision = judge(item)
+                except Exception as exc:  # ponytail: judge failure should not hide a source item.
+                    emit(log, f"[judge] {name} {item.title} failed: {exc.__class__.__name__}: {exc}")
+                else:
+                    action = "kept" if decision.keep else "rejected"
+                    emit(log, f"[judge] {name} {item.title} {action}: {decision.reason}")
+                    if not decision.keep:
+                        continue
             emit(log, f"[extract] {name} {index}/{len(items)} {item.title}")
             candidate = extractor(item)
             if candidate is not None:

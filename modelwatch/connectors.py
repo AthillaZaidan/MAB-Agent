@@ -205,8 +205,8 @@ class RssConnector:
 
 def default_connectors(config) -> list[Any]:
     return [
-        HuggingFaceConnector(config.max_items_per_source, config.model_prefixes),
-        OpenRouterConnector(config.max_items_per_source, config.model_prefixes),
+        HuggingFaceConnector(config.max_items_per_source),
+        OpenRouterConnector(config.max_items_per_source),
         ArxivConnector(config.arxiv_query, config.max_items_per_source),
         GitHubReleasesConnector(config.github_repos, config.max_items_per_source),
         RssConnector(config.rss_urls, config.max_items_per_source),

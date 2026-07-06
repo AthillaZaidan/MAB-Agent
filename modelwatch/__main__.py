@@ -5,6 +5,7 @@ import argparse
 from modelwatch.config import load_config
 from modelwatch.connectors import default_connectors
 from modelwatch.extractor import OllamaExtractor
+from modelwatch.judge import OllamaJudge
 from modelwatch.pipeline import run_pipeline
 from modelwatch.store import Store
 
@@ -27,6 +28,7 @@ def main() -> None:
     result = run_pipeline(
         connectors=default_connectors(config),
         extractor=OllamaExtractor(config.ollama_url, config.ollama_model),
+        judge=OllamaJudge(config.ollama_url, config.ollama_model),
         store=Store(config.database_path),
         output_dir=config.output_dir,
         window_hours=args.window_hours,
