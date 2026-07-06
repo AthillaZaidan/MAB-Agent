@@ -53,7 +53,9 @@ Important fields:
   "ollama_model": "qwen3:4b-instruct",
   "ollama_embedding_model": "nomic-embed-text",
   "email_to": "athillazaidanstudy@gmail.com",
-  "max_items_per_source": 100
+  "max_items_per_source": 100,
+  "huggingface_fetch_limit": 1000,
+  "huggingface_top_items": 150
 }
 ```
 

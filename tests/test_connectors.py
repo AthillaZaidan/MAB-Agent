@@ -19,6 +19,26 @@ def test_huggingface_connector_keeps_only_configured_model_prefixes(monkeypatch)
     assert [item.title for item in items] == ["Qwen/Qwen3-30B-A3B"]
 
 
+def test_huggingface_connector_fetches_large_pool_and_returns_ranked_top_items(monkeypatch):
+    seen = {}
+
+    def fake_get_json(_url, *, params):
+        seen.update(params)
+        return [
+            {"modelId": "random-user/qwen-lora", "lastModified": "2026-07-06T01:00:00Z", "downloads": 50_000, "likes": 500, "tags": ["lora"]},
+            {"modelId": "new-lab/GLM-6-70B-Instruct", "lastModified": "2026-07-06T01:00:00Z", "downloads": 100, "likes": 10, "tags": ["text-generation"]},
+            {"modelId": "Qwen/Qwen3-30B-A3B", "lastModified": "2026-07-06T01:00:00Z", "downloads": 1_000, "likes": 100, "tags": ["text-generation"]},
+            {"modelId": "google/gemma-4-31b-it", "lastModified": "2026-07-06T01:00:00Z", "downloads": 800, "likes": 80, "tags": ["text-generation"]},
+        ]
+
+    monkeypatch.setattr(connectors, "get_json", fake_get_json)
+
+    items = HuggingFaceConnector(max_items=2, fetch_limit=1000)(48)
+
+    assert seen["limit"] == 1000
+    assert [item.title for item in items] == ["Qwen/Qwen3-30B-A3B", "google/gemma-4-31b-it"]
+
+
 def test_openrouter_connector_keeps_only_configured_model_prefixes(monkeypatch):
     monkeypatch.setattr(
         connectors,

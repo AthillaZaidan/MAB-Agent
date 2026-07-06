@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
@@ -8,22 +9,24 @@ from typing import Any
 
 from modelwatch.http import get_json, get_text
 from modelwatch.models import RawItem
+from modelwatch.scoring import DERIVATIVE_RE, MODEL_FAMILY_RE, is_important_provider
 
 
 class HuggingFaceConnector:
     __name__ = "huggingface"
 
-    def __init__(self, max_items: int = 20, model_prefixes: list[str] | None = None):
+    def __init__(self, max_items: int = 150, model_prefixes: list[str] | None = None, fetch_limit: int = 1000):
         self.max_items = max_items
+        self.fetch_limit = fetch_limit
         self.model_prefixes = model_prefixes or []
 
     def __call__(self, window_hours: int) -> list[RawItem]:
         payload = get_json(
             "https://huggingface.co/api/models",
-            params={"sort": "lastModified", "direction": -1, "limit": self.max_items, "filter": "text-generation"},
+            params={"sort": "lastModified", "direction": -1, "limit": self.fetch_limit, "filter": "text-generation"},
         )
         cutoff = datetime.now(UTC) - timedelta(hours=window_hours)
-        items = []
+        models = []
         for model in payload:
             updated = parse_dt(model.get("lastModified"))
             if updated and updated < cutoff:
@@ -31,6 +34,11 @@ class HuggingFaceConnector:
             model_id = model.get("modelId") or model.get("id") or "unknown"
             if not matches_prefix(model_id, self.model_prefixes):
                 continue
+            models.append(model)
+        items = []
+        for model in sorted(models, key=huggingface_model_score, reverse=True)[: self.max_items]:
+            model_id = model.get("modelId") or model.get("id") or "unknown"
+            updated = parse_dt(model.get("lastModified"))
             text = " ".join(str(part) for part in [model_id, model.get("pipeline_tag"), ",".join(model.get("tags") or [])] if part)
             items.append(
                 RawItem(
@@ -205,7 +213,7 @@ class RssConnector:
 
 def default_connectors(config) -> list[Any]:
     return [
-        HuggingFaceConnector(config.max_items_per_source),
+        HuggingFaceConnector(config.huggingface_top_items, fetch_limit=config.huggingface_fetch_limit),
         OpenRouterConnector(config.max_items_per_source),
         ArxivConnector(config.arxiv_query, config.max_items_per_source),
         GitHubReleasesConnector(config.github_repos, config.max_items_per_source),
@@ -250,3 +258,23 @@ def child_text(node, name: str) -> str:
 
 def strip_html(value: str) -> str:
     return re.sub(r"<[^>]+>", " ", value)
+
+
+def huggingface_model_score(model: dict[str, Any]) -> float:
+    model_id = model.get("modelId") or model.get("id") or ""
+    owner = model_id.split("/")[0] if "/" in model_id else ""
+    tags = " ".join(model.get("tags") or [])
+    text = f"{model_id} {model.get('pipeline_tag') or ''} {tags}"
+    trusted = is_important_provider(owner)
+    score = 0.0
+    if trusted:
+        score += 100
+    if MODEL_FAMILY_RE.search(text):
+        score += 60
+    score += min(50, math.log10(float(model.get("downloads") or 0) + 1) * 10)
+    score += min(40, math.log10(float(model.get("likes") or 0) + 1) * 15)
+    if "text-generation" in text:
+        score += 10
+    if DERIVATIVE_RE.search(text) and not trusted:
+        score -= 120
+    return score

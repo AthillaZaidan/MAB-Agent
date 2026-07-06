@@ -17,6 +17,8 @@ class Config:
     github_repos: list[str] = field(default_factory=list)
     arxiv_query: str = 'cat:cs.CL AND (LLM OR "large language model" OR multimodal)'
     max_items_per_source: int = 20
+    huggingface_fetch_limit: int = 1000
+    huggingface_top_items: int = 150
     email_to: str | None = None
 
 
