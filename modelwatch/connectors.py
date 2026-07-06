@@ -13,8 +13,9 @@ from modelwatch.models import RawItem
 class HuggingFaceConnector:
     __name__ = "huggingface"
 
-    def __init__(self, max_items: int = 20):
+    def __init__(self, max_items: int = 20, model_prefixes: list[str] | None = None):
         self.max_items = max_items
+        self.model_prefixes = model_prefixes or []
 
     def __call__(self, window_hours: int) -> list[RawItem]:
         payload = get_json(
@@ -28,6 +29,8 @@ class HuggingFaceConnector:
             if updated and updated < cutoff:
                 continue
             model_id = model.get("modelId") or model.get("id") or "unknown"
+            if not matches_prefix(model_id, self.model_prefixes):
+                continue
             text = " ".join(str(part) for part in [model_id, model.get("pipeline_tag"), ",".join(model.get("tags") or [])] if part)
             items.append(
                 RawItem(
@@ -48,8 +51,9 @@ class HuggingFaceConnector:
 class OpenRouterConnector:
     __name__ = "openrouter"
 
-    def __init__(self, max_items: int = 20):
+    def __init__(self, max_items: int = 20, model_prefixes: list[str] | None = None):
         self.max_items = max_items
+        self.model_prefixes = model_prefixes or []
 
     def __call__(self, window_hours: int) -> list[RawItem]:
         payload = get_json("https://openrouter.ai/api/v1/models")
@@ -61,6 +65,8 @@ class OpenRouterConnector:
             if created and created < cutoff:
                 continue
             model_id = model.get("id") or model.get("name") or "unknown"
+            if not matches_prefix(model_id, self.model_prefixes):
+                continue
             items.append(
                 RawItem(
                     source_name="OpenRouter Models API",
@@ -199,12 +205,19 @@ class RssConnector:
 
 def default_connectors(config) -> list[Any]:
     return [
-        HuggingFaceConnector(config.max_items_per_source),
-        OpenRouterConnector(config.max_items_per_source),
+        HuggingFaceConnector(config.max_items_per_source, config.model_prefixes),
+        OpenRouterConnector(config.max_items_per_source, config.model_prefixes),
         ArxivConnector(config.arxiv_query, config.max_items_per_source),
         GitHubReleasesConnector(config.github_repos, config.max_items_per_source),
         RssConnector(config.rss_urls, config.max_items_per_source),
     ]
+
+
+def matches_prefix(model_id: str, prefixes: list[str]) -> bool:
+    if not prefixes:
+        return True
+    lowered = model_id.lower()
+    return any(lowered.startswith(prefix.lower()) for prefix in prefixes)
 
 
 def parse_dt(value: str | None) -> datetime | None:

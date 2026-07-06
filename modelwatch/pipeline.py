@@ -6,6 +6,7 @@ from pathlib import Path
 
 from modelwatch.digest import render_digest
 from modelwatch.models import Candidate, PipelineResult, RawItem
+from modelwatch.normalize import model_key
 from modelwatch.scoring import score_candidate
 from modelwatch.store import Store
 
@@ -26,6 +27,7 @@ def run_pipeline(
     started = datetime.now(UTC)
     failures: dict[str, str] = {}
     source_count = 0
+    run_candidate_keys: set[str] = set()
 
     for connector in connectors:
         name = getattr(connector, "__name__", connector.__class__.__name__)
@@ -48,12 +50,18 @@ def run_pipeline(
             emit(log, f"[extract] {name} {index}/{len(items)} {item.title}")
             candidate = extractor(item)
             if candidate is not None:
-                store.upsert_candidate(score_candidate(candidate))
-                emit(log, f"[extract] {name} candidate: {candidate.canonical_model_name}")
+                scored = score_candidate(candidate)
+                store.upsert_candidate(scored)
+                run_candidate_keys.add(model_key(scored.provider, scored.canonical_model_name, scored.parameter_size))
+                emit(log, f"[extract] {name} candidate: {scored.canonical_model_name}")
             else:
                 emit(log, f"[extract] {name} skipped")
 
-    candidates = store.list_candidates()
+    candidates = [
+        candidate
+        for candidate in store.list_candidates()
+        if model_key(candidate.provider, candidate.canonical_model_name, candidate.parameter_size) in run_candidate_keys
+    ]
     status = "failed" if source_count == 0 and failures else "partial_success" if failures else "success"
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)

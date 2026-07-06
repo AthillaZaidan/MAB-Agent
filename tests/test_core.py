@@ -118,6 +118,22 @@ def test_pipeline_survives_failed_connector(tmp_path):
     assert result.digest_path.exists()
 
 
+def test_pipeline_digest_only_uses_candidates_from_current_run(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    store.upsert_candidate(score_candidate(candidate("old-random-model")))
+
+    result = run_pipeline(
+        connectors=[lambda _window: [item("Qwen/Qwen3-30B-A3B")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=store,
+        output_dir=tmp_path,
+    )
+
+    digest = result.digest_path.read_text(encoding="utf-8")
+    assert "Qwen/Qwen3-30B-A3B" in digest
+    assert "old-random-model" not in digest
+
+
 def test_pipeline_logs_connector_progress_and_failures(tmp_path):
     store = Store(tmp_path / "modelwatch.sqlite")
     logs = []
