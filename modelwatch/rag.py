@@ -64,8 +64,14 @@ class VectorStore:
         )
         self.db.commit()
 
-    def search(self, embedding: list[float], limit: int = 3) -> list[SearchResult]:
-        rows = self.db.execute("select text, source_url, embedding from evidence_vectors").fetchall()
+    def search(self, embedding: list[float], limit: int = 3, source_url: str | None = None) -> list[SearchResult]:
+        if source_url is None:
+            rows = self.db.execute("select text, source_url, embedding from evidence_vectors").fetchall()
+        else:
+            rows = self.db.execute(
+                "select text, source_url, embedding from evidence_vectors where source_url = ?",
+                (source_url,),
+            ).fetchall()
         results = [
             SearchResult(row["text"], row["source_url"], cosine(embedding, json.loads(row["embedding"])))
             for row in rows

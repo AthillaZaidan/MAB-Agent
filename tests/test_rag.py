@@ -33,6 +33,16 @@ def test_vector_store_retrieves_similar_chunks(tmp_path):
     assert results[0].source_url == "https://example.test/qwen"
 
 
+def test_vector_store_can_scope_search_to_source_url(tmp_path):
+    store = VectorStore(tmp_path / "vectors.sqlite")
+    store.add("wrong but similar Qwen evidence", "https://example.test/wrong", [1.0, 0.0])
+    store.add("right Qwen evidence", "https://example.test/right", [0.9, 0.1])
+
+    results = store.search([1.0, 0.0], limit=3, source_url="https://example.test/right")
+
+    assert [result.source_url for result in results] == ["https://example.test/right"]
+
+
 def test_ollama_embedder_explains_missing_model(monkeypatch):
     def missing_model(*_args, **_kwargs):
         raise HTTPError("http://ollama.test/api/embeddings", 404, "Not Found", {}, None)
