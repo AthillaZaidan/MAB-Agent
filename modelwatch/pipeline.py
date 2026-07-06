@@ -53,13 +53,6 @@ def run_pipeline(
         for item in items:
             if store.save_source_item(item):
                 source_count += 1
-            if rag_enabled:
-                try:
-                    for chunk in chunk_text(item.raw_text, source_url=item.source_url):
-                        vector_store.add(chunk.text, chunk.source_url, embed(chunk.text))
-                except Exception as exc:  # ponytail: RAG is evidence enhancement; extraction still runs without it.
-                    emit(log, f"[rag] {name} {item.title} embed failed: {exc.__class__.__name__}: {exc}")
-                    rag_enabled = False
         for index, item in enumerate(items, 1):
             if judge is not None:
                 try:
@@ -71,6 +64,13 @@ def run_pipeline(
                     emit(log, f"[judge] {name} {item.title} {action}: {decision.reason}")
                     if not decision.keep:
                         continue
+            if rag_enabled:
+                try:
+                    for chunk in chunk_text(item.raw_text, source_url=item.source_url):
+                        vector_store.add(chunk.text, chunk.source_url, embed(chunk.text))
+                except Exception as exc:  # ponytail: RAG is evidence enhancement; extraction still runs without it.
+                    emit(log, f"[rag] {name} {item.title} embed failed: {exc.__class__.__name__}: {exc}")
+                    rag_enabled = False
             emit(log, f"[extract] {name} {index}/{len(items)} {item.title}")
             candidate = extractor(item)
             if candidate is not None:
@@ -80,7 +80,7 @@ def run_pipeline(
                         query = " ".join([scored.canonical_model_name, scored.provider or "", *scored.claimed_strengths])
                         scored.evidence_chunks = [
                             {"text": result.text, "source_url": result.source_url}
-                            for result in vector_store.search(embed(query), limit=3)
+                            for result in vector_store.search(embed(query), limit=3, source_url=item.source_url)
                         ]
                         scored.evidence_urls = list(dict.fromkeys([*scored.evidence_urls, *[chunk["source_url"] for chunk in scored.evidence_chunks]]))
                     except Exception as exc:  # ponytail: digest can still cite source URLs if vector lookup fails.

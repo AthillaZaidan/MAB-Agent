@@ -198,6 +198,53 @@ def test_pipeline_stores_and_retrieves_rag_evidence(tmp_path):
     assert "Qwen/Qwen3-30B-A3B is now available" in digest
 
 
+def test_pipeline_only_indexes_rag_for_judge_kept_items(tmp_path):
+    source_items = [
+        item("random-user/cool-lora", "https://example.test/rejected"),
+        item("Qwen/Qwen3-30B-A3B", "https://example.test/kept"),
+    ]
+    embedded_texts = []
+
+    def judge(raw_item):
+        return JudgeDecision(keep="Qwen/" in raw_item.title, reason="ok")
+
+    def embed(text):
+        embedded_texts.append(text)
+        return [1.0, 0.0]
+
+    run_pipeline(
+        connectors=[lambda _window: source_items],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        judge=judge,
+        store=Store(tmp_path / "modelwatch.sqlite"),
+        output_dir=tmp_path,
+        vector_store=VectorStore(tmp_path / "vectors.sqlite"),
+        embed=embed,
+    )
+
+    assert not any("random-user/cool-lora" in text for text in embedded_texts)
+    assert any("Qwen/Qwen3-30B-A3B" in text for text in embedded_texts)
+
+
+def test_pipeline_scopes_rag_evidence_to_candidate_source_url(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    vectors = VectorStore(tmp_path / "vectors.sqlite")
+    vectors.add("wrong but very similar Qwen evidence", "https://example.test/wrong", [1.0, 0.0])
+
+    run_pipeline(
+        connectors=[lambda _window: [item("Qwen/Qwen3-30B-A3B", "https://example.test/right")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=store,
+        output_dir=tmp_path,
+        vector_store=vectors,
+        embed=lambda text: [0.9, 0.1] if "available" in text else [1.0, 0.0],
+    )
+
+    [stored] = store.list_candidates()
+    assert stored.evidence_chunks
+    assert {chunk["source_url"] for chunk in stored.evidence_chunks} == {"https://example.test/right"}
+
+
 def test_pipeline_continues_when_rag_embedding_fails(tmp_path):
     logs = []
     calls = 0
