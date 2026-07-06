@@ -77,10 +77,11 @@ def run_pipeline(
     status = "failed" if source_count == 0 and failures else "partial_success" if failures else "success"
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    digest_path = output_path / f"digest-{datetime.now(UTC).date().isoformat()}.md"
+    now = datetime.now(UTC)
+    digest_path = output_path / f"digest-{now.strftime('%Y-%m-%d-%H%M%S')}.md"
     digest_path.write_text(
         render_digest(
-            date=datetime.now(UTC).date().isoformat(),
+            date=now.date().isoformat(),
             window_hours=window_hours,
             candidates=candidates,
             failures=failures,

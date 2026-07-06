@@ -118,6 +118,19 @@ def test_pipeline_survives_failed_connector(tmp_path):
     assert result.digest_path.exists()
 
 
+def test_pipeline_digest_filename_includes_timestamp(tmp_path):
+    result = run_pipeline(
+        connectors=[lambda _window: [item("Qwen3 4B Instruct")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=Store(tmp_path / "modelwatch.sqlite"),
+        output_dir=tmp_path,
+    )
+
+    assert result.digest_path.name.startswith("digest-")
+    assert result.digest_path.name.endswith(".md")
+    assert len(result.digest_path.stem) == len("digest-2026-07-06-013045")
+
+
 def test_pipeline_digest_only_uses_candidates_from_current_run(tmp_path):
     store = Store(tmp_path / "modelwatch.sqlite")
     store.upsert_candidate(score_candidate(candidate("old-random-model")))
