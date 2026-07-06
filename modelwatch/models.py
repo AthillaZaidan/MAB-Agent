@@ -35,6 +35,7 @@ class Candidate:
     availability: list[dict[str, str]]
     confidence: float
     evidence_urls: list[str]
+    evidence_chunks: list[dict[str, str]] = field(default_factory=list)
     benchmark_relevance_score: float = 0
     recommended_action: str = "Ignore unless manually reviewed"
     aliases: list[str] = field(default_factory=list)

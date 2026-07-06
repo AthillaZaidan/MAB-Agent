@@ -47,6 +47,7 @@ def render_digest(
         for idx, candidate in enumerate(entries, 1):
             evidence = ", ".join(candidate.evidence_urls) or "No evidence URL"
             strengths = "; ".join(candidate.claimed_strengths) or "No specific claim extracted"
+            snippets = " | ".join(chunk.get("text", "") for chunk in candidate.evidence_chunks[:2])
             lines.extend(
                 [
                     f"{idx}. {candidate.canonical_model_name}",
@@ -58,6 +59,7 @@ def render_digest(
                     f"   Why it matters: {strengths}",
                     f"   Suggested benchmark suite: {suggest_suite(candidate)}",
                     f"   Evidence: {evidence}",
+                    f"   Evidence snippets: {snippets or 'None'}",
                     f"   Recommended action: {candidate.recommended_action}",
                     "",
                 ]

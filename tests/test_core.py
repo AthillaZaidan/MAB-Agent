@@ -6,6 +6,7 @@ from modelwatch.digest import render_digest
 from modelwatch.models import Candidate, JudgeDecision, RawItem
 from modelwatch.normalize import model_key
 from modelwatch.pipeline import run_pipeline
+from modelwatch.rag import VectorStore
 from modelwatch.scoring import action_for_score, score_candidate
 from modelwatch.store import Store
 
@@ -177,6 +178,24 @@ def test_pipeline_judges_items_before_extraction(tmp_path):
     assert result.candidate_count == 1
     assert "[judge] <lambda> random-user/cool-lora rejected: personal LoRA" in logs
     assert "[judge] <lambda> Qwen/Qwen3-30B-A3B kept: benchmark-worthy foundation model" in logs
+
+
+def test_pipeline_stores_and_retrieves_rag_evidence(tmp_path):
+    store = Store(tmp_path / "modelwatch.sqlite")
+    vectors = VectorStore(tmp_path / "vectors.sqlite")
+
+    result = run_pipeline(
+        connectors=[lambda _window: [item("Qwen/Qwen3-30B-A3B")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=store,
+        output_dir=tmp_path,
+        vector_store=vectors,
+        embed=lambda text: [1.0, 0.0] if "Qwen" in text else [0.0, 1.0],
+    )
+
+    digest = result.digest_path.read_text(encoding="utf-8")
+    assert "Evidence snippets:" in digest
+    assert "Qwen/Qwen3-30B-A3B is now available" in digest
 
 
 def test_pipeline_logs_connector_progress_and_failures(tmp_path):

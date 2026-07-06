@@ -117,6 +117,7 @@ class Store:
         payload["benchmark_claims"] = [claim for claim in as_list(payload.get("benchmark_claims")) if isinstance(claim, dict)]
         payload["availability"] = [entry for entry in as_list(payload.get("availability")) if isinstance(entry, dict)]
         payload["evidence_urls"] = as_list(payload.get("evidence_urls"))
+        payload["evidence_chunks"] = [entry for entry in as_list(payload.get("evidence_chunks")) if isinstance(entry, dict)]
         payload["aliases"] = as_list(payload.get("aliases"))
         payload["confidence"] = as_float(payload.get("confidence"))
         payload["context_length"] = as_int(payload.get("context_length"))
@@ -130,6 +131,7 @@ class Store:
         availability = existing.availability + [entry for entry in new.availability if entry not in existing.availability]
         existing.aliases = aliases
         existing.evidence_urls = evidence
+        existing.evidence_chunks = existing.evidence_chunks + [entry for entry in new.evidence_chunks if entry not in existing.evidence_chunks]
         existing.claimed_strengths = strengths
         existing.availability = availability
         existing.confidence = max(existing.confidence, new.confidence)

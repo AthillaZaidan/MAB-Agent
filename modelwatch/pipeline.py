@@ -7,6 +7,7 @@ from pathlib import Path
 from modelwatch.digest import render_digest
 from modelwatch.models import Candidate, JudgeDecision, PipelineResult, RawItem
 from modelwatch.normalize import model_key
+from modelwatch.rag import VectorStore, chunk_text
 from modelwatch.scoring import score_candidate
 from modelwatch.store import Store
 
@@ -14,6 +15,7 @@ Connector = Callable[[int], list[RawItem]]
 Extractor = Callable[[RawItem], Candidate | None]
 Judge = Callable[[RawItem], JudgeDecision]
 Logger = Callable[[str], None]
+Embedder = Callable[[str], list[float]]
 
 
 def run_pipeline(
@@ -24,6 +26,8 @@ def run_pipeline(
     output_dir: str | Path,
     window_hours: int = 48,
     judge: Judge | None = None,
+    vector_store: VectorStore | None = None,
+    embed: Embedder | None = None,
     log: Logger | None = None,
 ) -> PipelineResult:
     started = datetime.now(UTC)
@@ -48,6 +52,9 @@ def run_pipeline(
         for item in items:
             if store.save_source_item(item):
                 source_count += 1
+            if vector_store is not None and embed is not None:
+                for chunk in chunk_text(item.raw_text, source_url=item.source_url):
+                    vector_store.add(chunk.text, chunk.source_url, embed(chunk.text))
         for index, item in enumerate(items, 1):
             if judge is not None:
                 try:
@@ -63,6 +70,13 @@ def run_pipeline(
             candidate = extractor(item)
             if candidate is not None:
                 scored = score_candidate(candidate)
+                if vector_store is not None and embed is not None:
+                    query = " ".join([scored.canonical_model_name, scored.provider or "", *scored.claimed_strengths])
+                    scored.evidence_chunks = [
+                        {"text": result.text, "source_url": result.source_url}
+                        for result in vector_store.search(embed(query), limit=3)
+                    ]
+                    scored.evidence_urls = list(dict.fromkeys([*scored.evidence_urls, *[chunk["source_url"] for chunk in scored.evidence_chunks]]))
                 store.upsert_candidate(scored)
                 run_candidate_keys.add(model_key(scored.provider, scored.canonical_model_name, scored.parameter_size))
                 emit(log, f"[extract] {name} candidate: {scored.canonical_model_name}")
