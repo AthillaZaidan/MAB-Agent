@@ -75,7 +75,40 @@ def test_email_config_from_env_reads_smtp_settings(monkeypatch):
     assert config.sender == "ModelWatch <sender@gmail.com>"
 
 
-def test_email_config_from_env_requires_credentials(monkeypatch):
+def test_email_config_from_env_loads_dotenv_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "MODELWATCH_SMTP_HOST=smtp.gmail.com",
+                "MODELWATCH_SMTP_PORT=587",
+                "MODELWATCH_SMTP_USERNAME=sender@gmail.com",
+                "MODELWATCH_SMTP_PASSWORD=app-password",
+                "MODELWATCH_EMAIL_FROM='ModelWatch <sender@gmail.com>'",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    for key in [
+        "MODELWATCH_SMTP_HOST",
+        "MODELWATCH_SMTP_PORT",
+        "MODELWATCH_SMTP_USERNAME",
+        "MODELWATCH_SMTP_PASSWORD",
+        "MODELWATCH_EMAIL_FROM",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
+    config = email_config_from_env("athillazaidanstudy@gmail.com")
+
+    assert config.host == "smtp.gmail.com"
+    assert config.port == 587
+    assert config.username == "sender@gmail.com"
+    assert config.password == "app-password"
+    assert config.sender == "ModelWatch <sender@gmail.com>"
+
+
+def test_email_config_from_env_requires_credentials(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("MODELWATCH_SMTP_HOST", raising=False)
 
     with pytest.raises(RuntimeError, match="MODELWATCH_SMTP_HOST"):

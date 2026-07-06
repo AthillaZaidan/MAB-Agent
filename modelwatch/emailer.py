@@ -17,7 +17,27 @@ class EmailConfig:
     sender: str
 
 
+def _load_dotenv(path: str | Path = ".env") -> None:
+    env_path = Path(path)
+    if not env_path.exists():
+        return
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        os.environ[key] = value
+
+
 def email_config_from_env(to: str) -> EmailConfig:
+    _load_dotenv()
     required = [
         "MODELWATCH_SMTP_HOST",
         "MODELWATCH_SMTP_USERNAME",
