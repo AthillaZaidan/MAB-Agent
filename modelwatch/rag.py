@@ -5,6 +5,7 @@ import math
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.error import HTTPError
 
 from modelwatch.http import post_json
 
@@ -28,7 +29,12 @@ class OllamaEmbedder:
         self.model = model
 
     def __call__(self, text: str) -> list[float]:
-        response = post_json(f"{self.base_url}/api/embeddings", {"model": self.model, "prompt": text})
+        try:
+            response = post_json(f"{self.base_url}/api/embeddings", {"model": self.model, "prompt": text})
+        except HTTPError as exc:
+            if exc.code == 404:
+                raise RuntimeError(f"embedding model unavailable; run `ollama pull {self.model}`") from exc
+            raise
         return [float(value) for value in response["embedding"]]
 
 

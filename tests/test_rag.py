@@ -1,4 +1,9 @@
-from modelwatch.rag import EvidenceChunk, VectorStore, chunk_text
+from urllib.error import HTTPError
+
+import pytest
+
+import modelwatch.rag as rag
+from modelwatch.rag import EvidenceChunk, OllamaEmbedder, VectorStore, chunk_text
 
 
 def test_chunk_text_splits_overlap_and_keeps_url():
@@ -26,3 +31,13 @@ def test_vector_store_retrieves_similar_chunks(tmp_path):
     assert len(results) == 1
     assert results[0].text == "Qwen reasoning model"
     assert results[0].source_url == "https://example.test/qwen"
+
+
+def test_ollama_embedder_explains_missing_model(monkeypatch):
+    def missing_model(*_args, **_kwargs):
+        raise HTTPError("http://ollama.test/api/embeddings", 404, "Not Found", {}, None)
+
+    monkeypatch.setattr(rag, "post_json", missing_model)
+
+    with pytest.raises(RuntimeError, match="ollama pull nomic-embed-text"):
+        OllamaEmbedder("http://ollama.test", "nomic-embed-text")("hello")

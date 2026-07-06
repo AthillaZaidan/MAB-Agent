@@ -198,6 +198,27 @@ def test_pipeline_stores_and_retrieves_rag_evidence(tmp_path):
     assert "Qwen/Qwen3-30B-A3B is now available" in digest
 
 
+def test_pipeline_continues_when_rag_embedding_fails(tmp_path):
+    logs = []
+
+    def broken_embed(_text):
+        raise RuntimeError("embedding model missing")
+
+    result = run_pipeline(
+        connectors=[lambda _window: [item("Qwen/Qwen3-30B-A3B")]],
+        extractor=lambda raw_item: candidate(raw_item.title),
+        store=Store(tmp_path / "modelwatch.sqlite"),
+        output_dir=tmp_path,
+        vector_store=VectorStore(tmp_path / "vectors.sqlite"),
+        embed=broken_embed,
+        log=logs.append,
+    )
+
+    assert result.status == "success"
+    assert result.candidate_count == 1
+    assert any(line.startswith("[rag]") and "embedding model missing" in line for line in logs)
+
+
 def test_pipeline_logs_connector_progress_and_failures(tmp_path):
     store = Store(tmp_path / "modelwatch.sqlite")
     logs = []
