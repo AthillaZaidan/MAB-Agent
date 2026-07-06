@@ -1,0 +1,28 @@
+from modelwatch.rag import EvidenceChunk, VectorStore, chunk_text
+
+
+def test_chunk_text_splits_overlap_and_keeps_url():
+    chunks = chunk_text(
+        "alpha beta gamma delta epsilon zeta",
+        source_url="https://example.test/model",
+        max_words=3,
+        overlap=1,
+    )
+
+    assert chunks == [
+        EvidenceChunk("alpha beta gamma", "https://example.test/model"),
+        EvidenceChunk("gamma delta epsilon", "https://example.test/model"),
+        EvidenceChunk("epsilon zeta", "https://example.test/model"),
+    ]
+
+
+def test_vector_store_retrieves_similar_chunks(tmp_path):
+    store = VectorStore(tmp_path / "vectors.sqlite")
+    store.add("Qwen reasoning model", "https://example.test/qwen", [1.0, 0.0])
+    store.add("random cooking recipe", "https://example.test/cook", [0.0, 1.0])
+
+    results = store.search([0.9, 0.1], limit=1)
+
+    assert len(results) == 1
+    assert results[0].text == "Qwen reasoning model"
+    assert results[0].source_url == "https://example.test/qwen"
