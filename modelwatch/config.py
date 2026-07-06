@@ -17,6 +17,7 @@ class Config:
     github_repos: list[str] = field(default_factory=list)
     arxiv_query: str = 'cat:cs.CL AND (LLM OR "large language model" OR multimodal)'
     max_items_per_source: int = 20
+    email_to: str | None = None
 
 
 def load_config(path: str | Path | None) -> Config:

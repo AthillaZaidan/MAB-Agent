@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from modelwatch.emailer import EmailConfig, send_digest_email
+import pytest
+
+from modelwatch.emailer import EmailConfig, email_config_from_env, send_digest_email
 
 
 class FakeSMTP:
@@ -55,3 +57,26 @@ def test_send_digest_email_uses_smtp_config(tmp_path, monkeypatch):
     assert message["From"] == "ModelWatch <sender@example.test>"
     assert message["Subject"].startswith("ModelWatch Digest")
     assert message.get_content() == "# Digest\n\nBody\n"
+
+
+def test_email_config_from_env_reads_smtp_settings(monkeypatch):
+    monkeypatch.setenv("MODELWATCH_SMTP_HOST", "smtp.gmail.com")
+    monkeypatch.setenv("MODELWATCH_SMTP_PORT", "587")
+    monkeypatch.setenv("MODELWATCH_SMTP_USERNAME", "sender@gmail.com")
+    monkeypatch.setenv("MODELWATCH_SMTP_PASSWORD", "app-password")
+    monkeypatch.setenv("MODELWATCH_EMAIL_FROM", "ModelWatch <sender@gmail.com>")
+
+    config = email_config_from_env("athillazaidanstudy@gmail.com")
+
+    assert config.host == "smtp.gmail.com"
+    assert config.port == 587
+    assert config.username == "sender@gmail.com"
+    assert config.password == "app-password"
+    assert config.sender == "ModelWatch <sender@gmail.com>"
+
+
+def test_email_config_from_env_requires_credentials(monkeypatch):
+    monkeypatch.delenv("MODELWATCH_SMTP_HOST", raising=False)
+
+    with pytest.raises(RuntimeError, match="MODELWATCH_SMTP_HOST"):
+        email_config_from_env("athillazaidanstudy@gmail.com")
