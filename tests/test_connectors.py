@@ -56,6 +56,23 @@ def test_openrouter_connector_keeps_only_configured_model_prefixes(monkeypatch):
     assert [item.title for item in items] == ["GPT-5 mini"]
 
 
+def test_openrouter_connector_ranks_frontier_models_before_newer_noise(monkeypatch):
+    monkeypatch.setattr(
+        connectors,
+        "get_json",
+        lambda *_args, **_kwargs: {
+            "data": [
+                {"id": "somebody/random-wrapper", "name": "Random wrapper", "created": 1783300000},
+                {"id": "anthropic/claude-sonnet-5", "name": "Anthropic: Claude Sonnet 5", "created": 1783000000},
+            ]
+        },
+    )
+
+    items = OpenRouterConnector(max_items=1)(168)
+
+    assert [item.title for item in items] == ["Anthropic: Claude Sonnet 5"]
+
+
 def test_rss_connector_keeps_valid_feeds_when_one_feed_fails(monkeypatch):
     def fake_get_text(url):
         if "bad.test" in url:

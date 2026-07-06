@@ -65,16 +65,20 @@ class OpenRouterConnector:
 
     def __call__(self, window_hours: int) -> list[RawItem]:
         payload = get_json("https://openrouter.ai/api/v1/models")
-        models = sorted(payload.get("data", []), key=lambda m: m.get("created") or 0, reverse=True)[: self.max_items]
         cutoff = datetime.now(UTC) - timedelta(hours=window_hours)
-        items = []
-        for model in models:
+        models = []
+        for model in payload.get("data", []):
             created = datetime.fromtimestamp(model["created"], UTC) if model.get("created") else None
             if created and created < cutoff:
                 continue
             model_id = model.get("id") or model.get("name") or "unknown"
             if not matches_prefix(model_id, self.model_prefixes):
                 continue
+            models.append(model)
+        items = []
+        for model in sorted(models, key=openrouter_model_score, reverse=True)[: self.max_items]:
+            created = datetime.fromtimestamp(model["created"], UTC) if model.get("created") else None
+            model_id = model.get("id") or model.get("name") or "unknown"
             items.append(
                 RawItem(
                     source_name="OpenRouter Models API",
@@ -277,4 +281,16 @@ def huggingface_model_score(model: dict[str, Any]) -> float:
         score += 10
     if DERIVATIVE_RE.search(text) and not trusted:
         score -= 120
+    return score
+
+
+def openrouter_model_score(model: dict[str, Any]) -> float:
+    model_id = model.get("id") or model.get("name") or ""
+    provider = model_id.split("/")[0] if "/" in model_id else ""
+    text = " ".join(str(model.get(key) or "") for key in ["id", "name", "description"])
+    score = float(model.get("created") or 0) / 10_000_000
+    if is_important_provider(provider):
+        score += 100
+    if MODEL_FAMILY_RE.search(text):
+        score += 60
     return score
