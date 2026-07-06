@@ -60,11 +60,15 @@ def action_for_score(score: float) -> str:
 
 
 def score_candidate(candidate: Candidate) -> Candidate:
+    text = candidate_text(candidate)
+    frontier = bool(MODEL_FAMILY_RE.search(text))
     novelty = 100 if candidate.release_type == "new_model" else 70 if candidate.release_type != "irrelevant" else 0
-    provider = 100 if is_important_provider(candidate.provider) else 55
-    availability = 100 if candidate.access_type in {"open_weight", "api_only"} else 35
-    benchmark = 100 if candidate.benchmark_claims or candidate.claimed_strengths else 40
-    modality = 100 if {"text", "vision"} & set(candidate.modality) else 45
+    provider = 100 if is_important_provider(candidate.provider) or frontier else 55
+    access = candidate.access_type.lower()
+    availability = 100 if access in {"open_weight", "api_only"} or "api" in access or "open" in access else 75 if frontier else 35
+    benchmark = 100 if candidate.benchmark_claims or candidate.claimed_strengths else 85 if frontier else 40
+    modality_text = " ".join(candidate.modality).lower()
+    modality = 100 if any(token in modality_text for token in ["text", "vision", "image"]) else 45
     adoption = min(100, 40 + 20 * len(candidate.evidence_urls))
     score = (
         0.25 * novelty
@@ -81,14 +85,7 @@ def score_candidate(candidate: Candidate) -> Candidate:
 def rejection_reason(candidate: Candidate) -> str | None:
     if candidate.release_type in {None, "irrelevant"}:
         return "irrelevant release type"
-    text = " ".join(
-        [
-            candidate.canonical_model_name,
-            candidate.provider or "",
-            " ".join(candidate.claimed_strengths),
-            " ".join(candidate.evidence_urls),
-        ]
-    )
+    text = candidate_text(candidate)
     hf_owner = huggingface_owner(candidate)
     if hf_owner and not is_important_provider(hf_owner) and DERIVATIVE_RE.search(text):
         return f"derivative or repack from untrusted Hugging Face owner: {hf_owner}"
@@ -109,3 +106,14 @@ def huggingface_owner(candidate: Candidate) -> str | None:
         if match:
             return match.group(1)
     return None
+
+
+def candidate_text(candidate: Candidate) -> str:
+    return " ".join(
+        [
+            candidate.canonical_model_name,
+            candidate.provider or "",
+            " ".join(candidate.claimed_strengths),
+            " ".join(candidate.evidence_urls),
+        ]
+    )

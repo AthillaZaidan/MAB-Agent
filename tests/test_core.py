@@ -75,6 +75,20 @@ def test_scoring_maps_candidate_to_benchmark_now():
     assert scored.recommended_action == "Benchmark now"
 
 
+def test_scoring_benchmarks_frontier_model_names_even_with_sparse_metadata():
+    sparse = candidate("claude-sonnet-5")
+    sparse.provider = None
+    sparse.access_type = "unknown"
+    sparse.modality = ["text-generation"]
+    sparse.claimed_strengths = []
+    sparse.evidence_urls = ["https://openrouter.ai/anthropic/claude-sonnet-5"]
+
+    scored = score_candidate(sparse)
+
+    assert scored.benchmark_relevance_score >= 80
+    assert scored.recommended_action == "Benchmark now"
+
+
 def test_filter_rejects_untrusted_huggingface_derivatives():
     bad = candidate("random-user/qwen-lora")
     bad.provider = "random-user"
