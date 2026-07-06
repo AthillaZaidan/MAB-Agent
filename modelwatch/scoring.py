@@ -42,6 +42,11 @@ MODEL_FAMILY_RE = re.compile(
     r"nemotron|nova|doubao|seed|falcon|phi|ernie|mimo|lfm|internvl|olmo|sea-lion|sahabat",
     re.IGNORECASE,
 )
+DERIVATIVE_RE = re.compile(
+    r"lora|adapter|gguf|awq|gptq|quant|quantized|mlx|qat|sft|dpo|rlhf|finetune|fine-tune|"
+    r"uncensored|abliterated|merge|merged|4bit|3bit|2bit|8bit|w\d+a\d+|debugger|custom",
+    re.IGNORECASE,
+)
 
 
 def action_for_score(score: float) -> str:
@@ -76,9 +81,6 @@ def score_candidate(candidate: Candidate) -> Candidate:
 def rejection_reason(candidate: Candidate) -> str | None:
     if candidate.release_type in {None, "irrelevant"}:
         return "irrelevant release type"
-    hf_owner = huggingface_owner(candidate)
-    if hf_owner and not is_important_provider(hf_owner):
-        return f"untrusted Hugging Face owner: {hf_owner}"
     text = " ".join(
         [
             candidate.canonical_model_name,
@@ -87,6 +89,9 @@ def rejection_reason(candidate: Candidate) -> str | None:
             " ".join(candidate.evidence_urls),
         ]
     )
+    hf_owner = huggingface_owner(candidate)
+    if hf_owner and not is_important_provider(hf_owner) and DERIVATIVE_RE.search(text):
+        return f"derivative or repack from untrusted Hugging Face owner: {hf_owner}"
     if not MODEL_FAMILY_RE.search(text):
         return "no frontier model family signal"
     return None

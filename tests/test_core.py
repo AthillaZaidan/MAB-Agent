@@ -7,7 +7,7 @@ from modelwatch.models import Candidate, JudgeDecision, RawItem
 from modelwatch.normalize import model_key
 from modelwatch.pipeline import run_pipeline
 from modelwatch.rag import VectorStore
-from modelwatch.scoring import action_for_score, score_candidate
+from modelwatch.scoring import action_for_score, rejection_reason, score_candidate
 from modelwatch.store import Store
 
 
@@ -73,6 +73,22 @@ def test_scoring_maps_candidate_to_benchmark_now():
 
     assert scored.benchmark_relevance_score >= 80
     assert scored.recommended_action == "Benchmark now"
+
+
+def test_filter_rejects_untrusted_huggingface_derivatives():
+    bad = candidate("random-user/qwen-lora")
+    bad.provider = "random-user"
+    bad.evidence_urls = ["https://huggingface.co/random-user/qwen-lora"]
+
+    assert rejection_reason(bad) == "derivative or repack from untrusted Hugging Face owner: random-user"
+
+
+def test_filter_allows_unknown_huggingface_frontier_family_candidates():
+    unknown = candidate("FutureLab/GLM-6-70B-Instruct")
+    unknown.provider = "FutureLab"
+    unknown.evidence_urls = ["https://huggingface.co/FutureLab/GLM-6-70B-Instruct"]
+
+    assert rejection_reason(unknown) is None
 
 
 def test_digest_groups_actions_and_includes_evidence():
