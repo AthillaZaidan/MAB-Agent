@@ -19,6 +19,7 @@ class Config:
     max_items_per_source: int = 20
     huggingface_fetch_limit: int = 1000
     huggingface_top_items: int = 150
+    llm_stats_url: str = "https://llm-stats.com/llm-updates"
     email_to: str | None = None
 
 

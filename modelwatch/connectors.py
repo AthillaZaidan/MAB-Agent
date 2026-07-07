@@ -5,7 +5,9 @@ import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urljoin
 
 from modelwatch.http import get_json, get_text
 from modelwatch.models import RawItem
@@ -92,6 +94,49 @@ class OpenRouterConnector:
                     raw_metadata=model,
                 )
             )
+        return items
+
+
+class LlmStatsConnector:
+    __name__ = "llm_stats"
+
+    def __init__(self, url: str = "https://llm-stats.com/llm-updates", max_items: int = 20):
+        self.url = url
+        self.max_items = max_items
+
+    def __call__(self, window_hours: int) -> list[RawItem]:
+        cutoff = datetime.now(UTC) - timedelta(hours=window_hours)
+        parser = LinkTextParser()
+        parser.feed(get_text(self.url))
+        current_date: datetime | None = None
+        items = []
+        for kind, value, href in parser.events:
+            date = parse_llm_stats_date(value)
+            if date is not None:
+                current_date = date
+                continue
+            if kind != "link" or current_date is None or current_date < cutoff:
+                continue
+            release = parse_llm_stats_release(value)
+            if release is None:
+                continue
+            title, release_type, access_type, provider = release
+            source_url = urljoin(self.url, href or "")
+            items.append(
+                RawItem(
+                    source_name="LLM Stats Updates",
+                    source_type="llm_stats",
+                    source_url=source_url,
+                    title=title,
+                    author_or_provider=provider,
+                    published_at=current_date,
+                    updated_at=None,
+                    raw_text=f"{title} {release_type} {access_type} {provider}",
+                    raw_metadata={"release_type": release_type, "access_type": access_type, "link_text": value},
+                )
+            )
+            if len(items) >= self.max_items:
+                break
         return items
 
 
@@ -219,6 +264,7 @@ def default_connectors(config) -> list[Any]:
     return [
         HuggingFaceConnector(config.huggingface_top_items, fetch_limit=config.huggingface_fetch_limit),
         OpenRouterConnector(config.max_items_per_source),
+        LlmStatsConnector(config.llm_stats_url, config.max_items_per_source),
         ArxivConnector(config.arxiv_query, config.max_items_per_source),
         GitHubReleasesConnector(config.github_repos, config.max_items_per_source),
         RssConnector(config.rss_urls, config.max_items_per_source),
@@ -262,6 +308,62 @@ def child_text(node, name: str) -> str:
 
 def strip_html(value: str) -> str:
     return re.sub(r"<[^>]+>", " ", value)
+
+
+def parse_llm_stats_date(value: str) -> datetime | None:
+    match = re.search(r"\b([A-Z][a-z]{2} \d{1,2}, \d{4})\s*·\s*\d+\s+release", value)
+    if not match:
+        return None
+    try:
+        return datetime.strptime(match.group(1), "%b %d, %Y").replace(hour=23, minute=59, second=59, tzinfo=UTC)
+    except ValueError:
+        return None
+
+
+def parse_llm_stats_release(value: str) -> tuple[str, str, str, str] | None:
+    text = re.sub(r"\s+", " ", value).split(" • ", 1)[0].strip()
+    match = re.match(r"(.+?)\s+(Proprietary|Open Source)\s+([A-Za-z0-9][A-Za-z0-9 .,/&-]+)$", text)
+    if not match:
+        return None
+    prefix, access_type, provider = match.groups()
+    release_type = "Release"
+    title = prefix
+    for candidate_type in ["Release", "Lightweight", "Coding", "Fast", "Pro"]:
+        suffix = f" {candidate_type}"
+        if prefix.endswith(suffix):
+            release_type = candidate_type
+            title = prefix[: -len(suffix)]
+            break
+    return title.strip(), release_type, access_type, provider.strip()
+
+
+class LinkTextParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.events: list[tuple[str, str, str | None]] = []
+        self._href: str | None = None
+        self._link_text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            self._href = dict(attrs).get("href")
+            self._link_text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._link_text.append(data)
+            return
+        text = data.strip()
+        if text:
+            self.events.append(("text", text, None))
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self._href is not None:
+            text = " ".join(part.strip() for part in self._link_text if part.strip())
+            if text:
+                self.events.append(("link", text, self._href))
+            self._href = None
+            self._link_text = []
 
 
 def huggingface_model_score(model: dict[str, Any]) -> float:

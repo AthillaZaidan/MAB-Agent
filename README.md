@@ -8,7 +8,7 @@ relevance, writes a timestamped Markdown digest, and can email the result.
 ## Architecture
 
 ```text
-API/RSS sources
+API/RSS/LLM Stats sources
 -> raw SQLite evidence
 -> evidence chunking
 -> Ollama embeddings
@@ -55,7 +55,8 @@ Important fields:
   "email_to": "athillazaidanstudy@gmail.com",
   "max_items_per_source": 100,
   "huggingface_fetch_limit": 1000,
-  "huggingface_top_items": 150
+  "huggingface_top_items": 150,
+  "llm_stats_url": "https://llm-stats.com/llm-updates"
 }
 ```
 

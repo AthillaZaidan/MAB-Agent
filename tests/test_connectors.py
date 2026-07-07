@@ -1,7 +1,7 @@
 from urllib.error import HTTPError
 
 import modelwatch.connectors as connectors
-from modelwatch.connectors import HuggingFaceConnector, OpenRouterConnector, RssConnector
+from modelwatch.connectors import HuggingFaceConnector, LlmStatsConnector, OpenRouterConnector, RssConnector
 
 
 def test_huggingface_connector_keeps_only_configured_model_prefixes(monkeypatch):
@@ -71,6 +71,30 @@ def test_openrouter_connector_ranks_frontier_models_before_newer_noise(monkeypat
     items = OpenRouterConnector(max_items=1)(168)
 
     assert [item.title for item in items] == ["Anthropic: Claude Sonnet 5"]
+
+
+def test_llm_stats_connector_extracts_release_timeline(monkeypatch):
+    monkeypatch.setattr(
+        connectors,
+        "get_text",
+        lambda *_args, **_kwargs: """
+        <h2>AI Model Releases</h2>
+        <div>Jun 30, 2026· 1 release</div>
+        <a href="/models/claude-sonnet-5">Claude Sonnet 5 Release Proprietary Anthropic • 1w ago</a>
+        <div>Jun 24, 2026· 1 release</div>
+        <a href="/models/seed-2-1-pro">Seed 2.1 Pro Pro Proprietary ByteDance • 1w ago</a>
+        """,
+    )
+
+    items = LlmStatsConnector(max_items=10)(168)
+
+    assert [item.title for item in items] == ["Claude Sonnet 5"]
+    assert items[0].source_name == "LLM Stats Updates"
+    assert items[0].source_type == "llm_stats"
+    assert items[0].source_url == "https://llm-stats.com/models/claude-sonnet-5"
+    assert items[0].author_or_provider == "Anthropic"
+    assert items[0].published_at.isoformat() == "2026-06-30T23:59:59+00:00"
+    assert "Proprietary" in items[0].raw_text
 
 
 def test_rss_connector_keeps_valid_feeds_when_one_feed_fails(monkeypatch):

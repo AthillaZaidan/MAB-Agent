@@ -9,6 +9,7 @@
   "max_items_per_source": 100,
   "huggingface_fetch_limit": 1000,
   "huggingface_top_items": 150,
+  "llm_stats_url": "https://llm-stats.com/llm-updates",
   "github_repos": [
     "ollama/ollama",
     "vllm-project/vllm",
